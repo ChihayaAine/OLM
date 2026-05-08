@@ -45,7 +45,7 @@ long-term memory tasks.
 
 ## OLM
 
-![OLM Framework](resource/OLM.png)
+![OLM Framework](resource/OLM.pdf)
 
 ## Methodology
 
