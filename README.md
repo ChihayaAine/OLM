@@ -1,216 +1,232 @@
-# OLM
+# OLM: Open-Loop Memory for Reliable Long-Horizon Language Agents
 
-Open-Loop Memory for reliable long-horizon language agents.
+Long-horizon language agents increasingly rely on memory systems to store,
+retrieve, and update past experience across sessions. However, existing
+memory architectures primarily treat memory as a source of relevant
+information, and do not explicitly preserve the unresolved conditions under
+which past conclusions were produced. As a result, agents may later use
+unverified assumptions, insufficient evidence, unresolved contradictions,
+deferred commitments, scope-limited solutions, or partially verified results
+as if they were settled facts. We propose **OLM**
+(**O**pen-**L**oop **M**emory), a memory control layer that
+treats unresolved epistemic obligations as first-class memory objects. OLM
+maintains open loops for unresolved conditions and activates them when a
+future claim, action, or memory use requires their closure. Activated loops
+can constrain reasoning, require targeted verification, block unsafe actions,
+or restrict the evidentiary use of otherwise valid semantic memories until
+the relevant condition is closed. OLM implements this lifecycle through
+three operators, `Open`, `RequiresClosed`, and `Close`,
+together with typed gates and memory-license invalidation over the closed
+knowledge store. Experiments on obligation-aware overlays of public
+long-horizon memory and agent benchmarks show that OLM reduces obligation
+violations and improves safe action blocking over strong memory and
+verification-gated baselines, while remaining competitive on standard
+long-term memory tasks.
 
-This repository is a reference implementation of the OLM
-framework from the paper. It contains:
+## Contributions
 
-- a stateful OLM control loop over closed memory and open-loop stores
-- typed loop objects for unresolved epistemic obligations
-- `Open`, `RequiresClosed`, and `Close` components
-- action gating, claim qualification, and memory-license invalidation
-- a mock backend and a real OpenAI-backed backend
-- benchmark loading from synthetic generation or JSONL files
-- experiment running, metric computation, and artifact export
+- We identify *evidence licensing* as a distinct failure mode in
+  long-horizon agent memory. The key insight is that agents may
+  retrieve factually correct memories but reuse them as stronger evidence
+  than the unresolved verification state permits.
 
-## What Is Implemented
+- We propose OLM, a lifecycle-managed memory control layer based on
+  open loops. OLM represents unresolved epistemic obligations as
+  persistent memory objects and regulates their effect through
+  `Open`, `RequiresClosed`, and `Close`, combining
+  obligation-conditioned activation, typed gates, and memory license
+  invalidation.
 
-The codebase covers the main algorithmic pieces described in the paper:
+- We show that OLM improves both standard long-term memory
+  performance and obligation-aware memory use. Across controlled
+  evaluations, OLM reduces obligation violations, improves hard-block
+  recall, and remains competitive on ordinary memory tasks compared with
+  strong retrieval-oriented and verification-gated baselines.
 
-- open-loop representation and lifecycle
-- obligation-conditioned activation
-- typed gate routing (`claim_dep`, `act_precond`, `mem_license`)
-- loop-aware action blocking / verification / hedging
-- resolution-driven closed-memory updates
-- experiment traces and evaluation metrics
+## OLM
 
-## Installation
+Main figure placeholder:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip setuptools wheel
-pip install -e .
-```
+- Put the PDF figure at `resource/OLM.pdf`
+- If you later want a rendered preview in the repository front page, also export
+  a PNG version at `resource/OLM.png`
 
-## Running Experiments
+![OLM Framework](resource/OLM.png)
 
-### 1. Synthetic benchmark with mock backend
+## Methodology
 
-```bash
-olm --benchmark synthetic --backend mock --sessions 16
-```
+OLM augments a conventional closed store $\mathcal{K}_t$ with an open-loop
+store $\mathcal{L}_t$. Closed memories are retrieved as evidence; open
+loops activate when the current decision would depend on, contradict, or
+be invalidated by an unresolved condition. A memory in $\mathcal{K}_t$
+encodes what the agent \emph{may use}; a loop in $\mathcal{L}_t$ encodes
+what the agent is \emph{not yet entitled to assume}.
 
-### 2. Synthetic benchmark with OpenAI backend
+OLM is organized around three interfaces---\textsc{Open},
+\textsc{RequiresClosed}, and \textsc{Close}---whose contracts are defined
+in Section~\ref{sec:interfaces}. We instantiate all three as structured
+LLM classifiers; a lightweight embedding prefilter is applied before
+invoking \textsc{RequiresClosed} to keep pairwise queries tractable.
 
-```bash
-export OPENAI_API_KEY=...
-olm --benchmark synthetic --backend openai --sessions 16
-```
+### Memory as a Constrained Decision Process
 
-### 3. JSONL dataset with artifact export
+At each step $t$, the standard memory-augmented policy is
+$a_t \sim \pi_0(a \mid x_t, R_{\mathcal{K}}(x_t)).$
+OLM first assigns each candidate action and draft claim a license state.
+Actions whose required loops remain unresolved are removed from the
+admissible set unless a low-cost verification action is available; the
+base policy then selects only among admissible actions:
 
-```bash
-olm \
-  --benchmark jsonl \
-  --backend mock \
-  --sessions-file data/sample_sessions.jsonl \
-  --memories-file data/sample_memories.jsonl \
-  --output-dir outputs/sample_run
-```
+$$
+  a_t \sim \pi_{\mathrm{OLM}}
+  (a \mid x_t, R_{\mathcal{K}}(x_t), A_{\mathcal{L}}(x_t)),
+  \qquad
+  a_t \in \Omega_t,
+$$
 
-### 4. Automatic backend selection
+where $A_{\mathcal{L}}(x_t)\subseteq \mathcal{L}_t$ is the activated loop
+set and $\Omega_t$ is the admissible action set after loop constraints.
 
-```bash
-olm --benchmark synthetic --backend auto --sessions 16
-```
+### Open-Loop Representation
 
-`auto` uses the OpenAI backend when `OPENAI_API_KEY` or
-`OLM_OPENAI_API_KEY` is present. Otherwise it falls back to `mock`.
+An open loop is a persistent record of an unresolved obligation:
 
-## JSON Output
+$$
+  \ell =
+  (id_\ell,\,r_\ell,\,p_\ell,\,E_\ell,\,T_\ell,\,q_\ell,\,
+   g_\ell,\,\rho_\ell,\,s_\ell,\,\Gamma_\ell,\,\mathcal{M}_\ell,\,\pi_\ell).
+$$
 
-```bash
-olm --benchmark synthetic --backend mock --sessions 8 --json
-```
+The loop type $r_\ell$ (one of six values: `assumption`,
+`evidence_gap`, `contradiction`,
+`deferred_commitment`, `scope_limit`,
+`partial_verification`) governs evidence aggregation,
+unresolvedness scoring, and closure semantics.
+The proposition $p_\ell$ is the unresolved claim; $E_\ell$ the signed
+evidence set; $T_\ell$ the typed trigger schema; $q_\ell$ the closure
+predicate; $g_\ell$ the gate constraint; $\rho_\ell$ a risk score;
+$\Gamma_\ell$ scope conditions; $\mathcal{M}_\ell$ the closed-memory ids
+whose licensed use is conditioned on this loop; and $\pi_\ell$ provenance.
 
-This prints:
+The closure predicate $q_\ell$ must be \emph{operational}---evaluable
+from future evidence under a declared modality (`tool-verifiable`,
+`user-query-verifiable`, `evidence-threshold`, or
+`monitorable`). It returns:
 
-- benchmark name
-- aggregate metrics
-- per-session traces
-- final closed/open memory state
+$$
+  q_\ell(E_\ell) \in
+  \{\texttt{confirmed},\,\texttt{refuted},\,
+    \texttt{superseded},\,\texttt{insufficient}\},
+$$
 
-## Artifact Export
+with the first three outcomes closing the loop. The lifecycle state
+$s_\ell \in \{\texttt{open},\,\texttt{investigating},\,
+\texttt{closed\_confirmed},\,\texttt{closed\_refuted},\,
+\texttt{superseded},\,\texttt{stale},\,\texttt{expired}\}$
+prevents unbounded accumulation via `stale` and `expired`
+transitions.
 
-When `--output-dir` is provided, the runner writes:
+The admissibility condition $\mathrm{Adm}(\ell)$ requires: (i)
+$\mathcal{O}(q_\ell)$---the closure predicate is evaluable; (ii)
+$T_\ell \neq \emptyset$---at least one trigger condition exists; (iii)
+$\rho_\ell > \theta_\rho \vee \mathrm{HighStake}(T_\ell)$---the
+obligation is consequential or its triggers reference irreversible
+actions; and (iv) $\Delta(\ell,\mathcal{L}_t) > \theta_{\mathrm{new}}$---
+the loop is sufficiently distinct from existing ones.
 
-- `traces.jsonl`
-- `metrics.json`
-- `final_state.json`
+### Opening and Activating Loops
 
-## Dataset Format
+\textsc{Open} extracts candidate obligations from a trajectory segment:
+$\widehat{\mathcal{L}}_{i:j} = \textsc{Open}(\tau_{i:j}, \mathcal{K}_t).$
+Loop creation occurs post-session and before high-stakes actions.
 
-### Session JSONL
+Activation is governed by \textsc{RequiresClosed}. OLM collects decision
+objects $\mathcal{D}_t = \mathcal{D}^{\mathrm{act}}_t \cup
+\mathcal{D}^{\mathrm{claim}}_t \cup \mathcal{D}^{\mathrm{mem}}_t$.
+For each $d \in \mathcal{D}_t$ and loop $\ell$, \textsc{RequiresClosed}
+returns $(b_{\ell,d},\, \nu_{\ell,d},\, c_{\ell,d},\,
+\mathcal{E}^*_{\ell,d})$; a loop activates when $b_{\ell,d} = 1$ and
+$c_{\ell,d} > \theta_{\mathrm{act}}$ for some $d$. Under context budget
+pressure, activated loops are prioritized by
 
-One JSON object per line:
+$$
+  \omega_\ell(t)
+  =
+  \rho_\ell \cdot u_\ell \cdot
+  \max_{d \in \mathcal{D}_t} c_{\ell,d} \cdot
+  \exp[-\lambda_{\mathrm{age}}(t - t_\ell)],
+$$
 
-```json
-{
-  "session_id": "sample-001",
-  "query": "Can I claim the auth root cause is fully fixed and ship it now?",
-  "metadata": {
-    "scenario": "partial_verification",
-    "domain": "software",
-    "stakes": "high",
-    "risk_score": 0.92,
-    "query_type": "claim",
-    "reversible": false,
-    "verification_cost": 2,
-    "verify_budget": 3,
-    "scope_mismatch": false,
-    "irreversible_action": true,
-    "has_assumption": false,
-    "has_evidence_gap": false,
-    "has_contradiction": false,
-    "has_deferred_commitment": false,
-    "has_scope_limit": false,
-    "has_partial_verification": true
-  },
-  "gold": {
-    "should_block_unsafe": true,
-    "should_qualify": false,
-    "scenario": "partial_verification"
-  }
-}
-```
+where $u_\ell \in [0,1]$ is a type-specific unresolvedness score.
 
-### Memory JSONL
+### Loop-Gated Reasoning and Memory Use
 
-```json
-{
-  "memory_id": "mem-auth-fix",
-  "text": "Unit test passed after parser patch for auth failure.",
-  "tags": ["auth", "parser", "unit_test"],
-  "source": "sample_corpus",
-  "factual_confidence": 0.8,
-  "license_status": "usable",
-  "metadata": {
-    "scope": "auth",
-    "kind": "patch_result"
-  }
-}
-```
+The relation type $\nu_{\ell,d}$ routes each activated loop to one of
+three gate types:
 
-Example files are in:
+| $\nu_{\ell,d}$ | Gate type | Effect |
+|---|---|---|
+| `claim_dep` | Epistemic | Hedge, qualify, or verify before claiming |
+| `act_precond` | Action | Block or route through hard gate |
+| `mem_license` | License | Downgrade $\kappa_i \in \mathcal{M}_\ell$ license status |
+| $\mathcal{E}^*_{\ell,d}\neq\emptyset$, low cost | Inquiry | Issue targeted verification |
 
-- [data/sample_sessions.jsonl](/Users/Zhuanz1/Desktop/new_terminal_bench/OLM/data/sample_sessions.jsonl)
-- [data/sample_memories.jsonl](/Users/Zhuanz1/Desktop/new_terminal_bench/OLM/data/sample_memories.jsonl)
+For irreversible actions, a two-phase hard gate applies:
 
-## Backends
+$$
+  \textsc{Gate}(a, \ell) =
+  \begin{cases}
+    \texttt{allow}, & b_{\ell,a} = 0, \\
+    \texttt{verify}(v^\star), & \mathcal{E}^*_{\ell,a} \neq \emptyset
+      \;\wedge\; \operatorname{cost}(v^\star) \leq \delta, \\
+    \texttt{hedge\_or\_defer}, & a \text{ is reversible or linguistic}, \\
+    \texttt{block}, & \text{otherwise.}
+  \end{cases}
+$$
 
-### Mock backend
+If the result is $\texttt{verify}(v^\star)$, the agent executes $v^\star$,
+updates loop evidence via \textsc{Close}, and re-evaluates the gate.
 
-The mock backend is deterministic enough for local development and tests. It
-uses local heuristic components.
+Open loops regulate closed memory by downgrading \emph{license status}:
+$\mathrm{License}(\kappa_i, d, \mathcal{A}_t) \in \{
+\texttt{usable},\, \texttt{context\_only},\,
+\texttt{requires\_qualification},\, \texttt{blocked}\}$,
+assigned when $\kappa_i \in \mathcal{M}_\ell$ and $\nu_{\ell,d} =
+\texttt{mem\_license}$. This separates factual content from evidentiary
+role: ``unit test passed after parser patch'' remains factually correct,
+but an activated `partial_verification` loop prevents it from
+licensing ``root cause was resolved.''
 
-### OpenAI backend
+### Closing Loops and Consolidating Memory
 
-The OpenAI backend uses the Responses API with structured JSON outputs for:
+\textsc{Close} appends signed evidence and updates loop state. When a
+loop closes, OLM distills a resolution record and revises affected closed
+memories via one of four updates ordered from least to most destructive:
+`preserve`, `downgrade_license`, `attach_scope`,
+or `tombstone`. Separating `downgrade_license` from
+confidence reduction ensures that memories whose facts are correct but
+whose evidentiary role is invalidated are not erroneously weakened.
 
-- retrieval reranking
-- `Open`
-- `RequiresClosed`
-- `Close`
-- policy action / claim proposal and action selection
+### Interface Specification
 
-Environment variables:
+\textsc{Open} maps a trajectory segment and closed store to typed
+candidate loops, each carrying an operational closure predicate and at
+least one trigger entry. \textsc{RequiresClosed} is the central predicate:
 
-- `OPENAI_API_KEY` or `OLM_OPENAI_API_KEY`
-- `OLM_OPENAI_MODEL`
-- `OLM_OPENAI_TIMEOUT`
-- `OLM_OPENAI_MAX_RETRIES`
+$$
+  \textsc{RequiresClosed}(d,\, \ell)
+  \;\longmapsto\;
+  \bigl(\,b,\;\nu,\;c,\;\mathcal{E}^*\bigr),
+$$
 
-The default model is `gpt-4o-mini`.
+where $b \in \{0,1\}$ is the closure-requirement decision; $\nu$ routes
+to the appropriate gate; $c \in [0,1]$ is confidence; and $\mathcal{E}^*$
+is sufficient evidence for closure. \textsc{Close} maps new observations
+to updated evidence and a closure verdict.
 
-## Metrics
-
-The evaluator currently reports:
-
-- `unsafe_block_recall`
-- `qualification_recall`
-- `obligation_activation_rate`
-- `verification_rate`
-- `average_activated_loops`
-
-These are computed from benchmark gold fields plus runtime traces.
-
-## Repository Layout
-
-```text
-src/olm/
-  runtime.py       # OLM control loop
-  benchmarks.py    # synthetic benchmark + JSONL dataset loading
-  cli.py           # experiment CLI
-  components.py    # mock and OpenAI-backed components
-  evaluation.py    # metric computation
-  gating.py        # action and memory-license gates
-  memory.py        # closed-memory update helpers
-  openai_client.py # OpenAI Responses API client
-  operators.py     # local heuristic operator implementations
-  runner.py        # experiment execution + artifact writing
-  store.py         # closed/open stores
-  types.py         # core dataclasses
-data/
-  sample_*.jsonl
-tests/
-  test_smoke.py
-```
-
-## Notes
-
-This repository is intended to be strong enough for code release review and
-paper artifact inspection. It still does not include official adapters for
-public benchmarks such as LongMemEval, LoCoMo, MemoryAgentBench, or
-MemoryArena; instead, it provides a clean JSONL protocol and experiment runner
-that those adapters can target.
+These contracts constitute the algorithmic contribution of OLM and admit
+symbolic checkers, static analyzers, or learned classifiers as alternative
+instantiations. The TSM+VerifyGate baseline receives the same verification
+backbone and uses per-entry scope tags and hedging at retrieval time, but
+lacks obligation lifecycle management and obligation-conditioned
+activation---isolating OLM's specific contribution.
