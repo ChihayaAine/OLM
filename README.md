@@ -45,7 +45,7 @@ long-term memory tasks.
 
 ## OLM
 
-![OLM Framework](resource/OLM.png)
+![OLM Framework](resource/OLM.pdf)
 
 ## Methodology
 
@@ -102,7 +102,7 @@ unresolvedness scoring, and closure semantics.
 The proposition $p_\ell$ is the unresolved claim; $E_\ell$ the signed
 evidence set; $T_\ell$ the typed trigger schema; $q_\ell$ the closure
 predicate; $g_\ell$ the gate constraint; $\rho_\ell$ a risk score;
-$\Gamma_\ell$ scope conditions; $\mathcal{M}_\ell$ the closed-memory ids
+`Gamma_ell` the scope conditions; $\mathcal{M}_\ell$ the closed-memory ids
 whose licensed use is conditioned on this loop; and $\pi_\ell$ provenance.
 
 The closure predicate $q_\ell$ must be *operational*---evaluable
@@ -147,11 +147,7 @@ $$
 $$
 
 For each $d \in \mathcal{D}_t$ and loop $\ell$, `RequiresClosed`
-returns:
-
-$$
-(b_{\ell,d},\, \nu_{\ell,d},\, c_{\ell,d},\, \mathcal{E}^*_{\ell,d})
-$$
+returns the tuple `(b_ell_d, nu_ell_d, c_ell_d, E_star_ell_d)`.
 
 A loop activates when `b_{ell,d} = 1` and `c_{ell,d} > theta_act` for some
 decision object `d`. Under context budget
@@ -169,7 +165,7 @@ where $u_\ell \in [0,1]$ is a type-specific unresolvedness score.
 
 ### Loop-Gated Reasoning and Memory Use
 
-The relation type $\nu_{\ell,d}$ routes each activated loop to one of
+The relation type `nu_ell_d` routes each activated loop to one of
 three gate types:
 
 | $\nu_{\ell,d}$ | Gate type | Effect |
