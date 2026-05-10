@@ -65,21 +65,21 @@ invoking `RequiresClosed` to keep pairwise queries tractable.
 
 At each step $t$, the standard memory-augmented policy is:
 
-```math
+$$
 a_t \sim \pi_0(a \mid x_t, R_{\mathcal{K}}(x_t))
-```
+$$
 
 OLM first assigns each candidate action and draft claim a license state.
 Actions whose required loops remain unresolved are removed from the
 admissible set unless a low-cost verification action is available; the
 base policy then selects only among admissible actions:
 
-```math
-a_t \sim \pi_{\mathrm{OLM}}
+$$
+a_t \sim \pi_{\text{OLM}}
 (a \mid x_t, R_{\mathcal{K}}(x_t), A_{\mathcal{L}}(x_t)),
-\qquad
+\quad
 a_t \in \Omega_t
-```
+$$
 
 where $A_{\mathcal{L}}(x_t)\subseteq \mathcal{L}_t$ is the activated loop
 set and $\Omega_t$ is the admissible action set after loop constraints.
@@ -88,11 +88,11 @@ set and $\Omega_t$ is the admissible action set after loop constraints.
 
 An open loop is a persistent record of an unresolved obligation:
 
-```math
+$$
 \ell =
 (id_\ell,\,r_\ell,\,p_\ell,\,E_\ell,\,T_\ell,\,q_\ell,\,
  g_\ell,\,\rho_\ell,\,s_\ell,\,\Gamma_\ell,\,\mathcal{M}_\ell,\,\pi_\ell)
-```
+$$
 
 The loop type $r_\ell$ (one of six values: `assumption`,
 `evidence_gap`, `contradiction`,
@@ -110,62 +110,64 @@ from future evidence under a declared modality (`tool-verifiable`,
 `external-query-verifiable`, `evidence-threshold`, or
 `monitorable`). It returns:
 
-```math
+$$
 q_\ell(E_\ell) \in
-\{\mathrm{confirmed},\,\mathrm{refuted},\,\mathrm{superseded},\,\mathrm{insufficient}\}
-```
+\{\texttt{confirmed},\,\texttt{refuted},\,\texttt{superseded},\,\texttt{insufficient}\}
+$$
 
 with the first three outcomes closing the loop. The lifecycle state
-$s_\ell \in \{\mathrm{open},\,\mathrm{investigating},\,
-\mathrm{closed\_confirmed},\,\mathrm{closed\_refuted},\,
-\mathrm{superseded},\,\mathrm{stale},\,\mathrm{expired}\}$
+$$
+s_\ell \in \{\texttt{open},\,\texttt{investigating},\,
+\texttt{closed\_confirmed},\,\texttt{closed\_refuted},\,
+\texttt{superseded},\,\texttt{stale},\,\texttt{expired}\}
+$$
 prevents unbounded accumulation via `stale` and `expired`
 transitions.
 
-The admissibility condition $\mathrm{Adm}(\ell)$ requires: (i)
+The admissibility condition $\text{Adm}(\ell)$ requires: (i)
 $\mathcal{O}(q_\ell)$---the closure predicate is evaluable; (ii)
 $T_\ell \neq \emptyset$---at least one trigger condition exists; (iii)
-$\rho_\ell > \theta_\rho \vee \mathrm{HighStake}(T_\ell)$---the
+$\rho_\ell > \theta_\rho \vee \text{HighStake}(T_\ell)$---the
 obligation is consequential or its triggers reference irreversible
-actions; and (iv) $\Delta(\ell,\mathcal{L}_t) > \theta_{\mathrm{new}}$---
+actions; and (iv) $\Delta(\ell,\mathcal{L}_t) > \theta_{\text{new}}$---
 the loop is sufficiently distinct from existing ones.
 
 ### Opening and Activating Loops
 
 `Open` extracts candidate obligations from a trajectory segment:
 
-```math
-\widehat{\mathcal{L}}_{i:j} = \mathrm{Open}(\tau_{i:j}, \mathcal{K}_t)
-```
+$$
+\widehat{\mathcal{L}}_{i:j} = \text{Open}(\tau_{i:j}, \mathcal{K}_t)
+$$
 
 Loop creation occurs post-session and before high-stakes actions.
 
 Activation is governed by `RequiresClosed`. OLM collects decision
 objects:
 
-```math
-\mathcal{D}_t = \mathcal{D}^{\mathrm{act}}_t \cup
-\mathcal{D}^{\mathrm{claim}}_t \cup \mathcal{D}^{\mathrm{mem}}_t
-```
+$$
+\mathcal{D}_t = \mathcal{D}^{\text{act}}_t \cup
+\mathcal{D}^{\text{claim}}_t \cup \mathcal{D}^{\text{mem}}_t
+$$
 
 For each $d \in \mathcal{D}_t$ and loop $\ell$, `RequiresClosed`
 returns:
 
-```math
+$$
 (b_{\ell,d},\, \nu_{\ell,d},\, c_{\ell,d},\, \mathcal{E}^*_{\ell,d})
-```
+$$
 
 A loop activates when $b_{\ell,d} = 1$ and
-$c_{\ell,d} > \theta_{\mathrm{act}}$ for some $d$. Under context budget
+$c_{\ell,d} > \theta_{\text{act}}$ for some $d$. Under context budget
 pressure, activated loops are prioritized by
 
-```math
+$$
 \omega_\ell(t)
 =
 \rho_\ell \cdot u_\ell \cdot
 \max_{d \in \mathcal{D}_t} c_{\ell,d} \cdot
-\exp[-\lambda_{\mathrm{age}}(t - t_\ell)]
-```
+\exp[-\lambda_{\text{age}}(t - t_\ell)]
+$$
 
 where $u_\ell \in [0,1]$ is a type-specific unresolvedness score.
 
@@ -183,26 +185,26 @@ three gate types:
 
 For irreversible actions, a two-phase hard gate applies:
 
-```math
-\mathrm{Gate}(a, \ell) =
+$$
+\text{Gate}(a, \ell) =
 \begin{cases}
-  \mathrm{allow}, & b_{\ell,a} = 0, \\
-  \mathrm{verify}(v^\star), & \mathcal{E}^*_{\ell,a} \neq \emptyset
-    \;\wedge\; \operatorname{cost}(v^\star) \leq \delta, \\
-  \mathrm{hedge\_or\_defer}, & a \text{ is reversible or linguistic}, \\
-  \mathrm{block}, & \text{otherwise.}
+  \texttt{allow}, & b_{\ell,a} = 0, \\
+  \texttt{verify}(v^\star), & \mathcal{E}^*_{\ell,a} \neq \emptyset
+    \;\wedge\; \text{cost}(v^\star) \leq \delta, \\
+  \texttt{hedge\_or\_defer}, & a \text{ is reversible or linguistic}, \\
+  \texttt{block}, & \text{otherwise.}
 \end{cases}
-```
+$$
 
-If the result is $\mathrm{verify}(v^\star)$, the runtime executes $v^\star$,
+If the result is $\texttt{verify}(v^\star)$, the runtime executes $v^\star$,
 updates loop evidence via `Close`, and re-evaluates the gate.
 
 Open loops regulate closed memory by downgrading *license status*:
 
-```math
-\mathrm{License}(\kappa_i, d, \mathcal{A}_t) \in
-\{\mathrm{usable},\, \mathrm{context\_only},\, \mathrm{requires\_qualification},\, \mathrm{blocked}\}
-```
+$$
+\text{License}(\kappa_i, d, \mathcal{A}_t) \in
+\{\texttt{usable},\, \texttt{context\_only},\, \texttt{requires\_qualification},\, \texttt{blocked}\}
+$$
 
 assigned when $\kappa_i \in \mathcal{M}_\ell$ and $\nu_{\ell,d} =
 `mem_license`. This separates factual content from evidentiary
@@ -226,11 +228,9 @@ whose evidentiary role is invalidated are not erroneously weakened.
 candidate loops, each carrying an operational closure predicate and at
 least one trigger entry. `RequiresClosed` is the central predicate:
 
-```math
-\mathrm{RequiresClosed}(d,\, \ell)
-\;\longmapsto\;
-\bigl(\,b,\;\nu,\;c,\;\mathcal{E}^*\bigr)
-```
+$$
+\text{RequiresClosed}(d, \ell) \to (b, \nu, c, \mathcal{E}^*)
+$$
 
 where $b \in \{0,1\}$ is the closure-requirement decision; $\nu$ routes
 to the appropriate gate; $c \in [0,1]$ is confidence; and $\mathcal{E}^*$
