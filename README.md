@@ -45,7 +45,7 @@ long-term memory tasks.
 
 ## OLM
 
-![OLM Framework](resource/OLM.pdf)
+![OLM Framework](resource/OLM.png)
 
 ## Methodology
 
@@ -115,22 +115,18 @@ q_\ell(E_\ell) \in
 \{\texttt{confirmed},\,\texttt{refuted},\,\texttt{superseded},\,\texttt{insufficient}\}
 $$
 
-with the first three outcomes closing the loop. The lifecycle state
-$$
-s_\ell \in \{\texttt{open},\,\texttt{investigating},\,
-\texttt{closed\_confirmed},\,\texttt{closed\_refuted},\,
-\texttt{superseded},\,\texttt{stale},\,\texttt{expired}\}
-$$
-prevents unbounded accumulation via `stale` and `expired`
-transitions.
+with the first three outcomes closing the loop. The lifecycle state can be one
+of: `open`, `investigating`, `closed_confirmed`, `closed_refuted`,
+`superseded`, `stale`, or `expired`. This prevents unbounded accumulation via
+`stale` and `expired` transitions.
 
-The admissibility condition $\text{Adm}(\ell)$ requires: (i)
-$\mathcal{O}(q_\ell)$---the closure predicate is evaluable; (ii)
-$T_\ell \neq \emptyset$---at least one trigger condition exists; (iii)
-$\rho_\ell > \theta_\rho \vee \text{HighStake}(T_\ell)$---the
-obligation is consequential or its triggers reference irreversible
-actions; and (iv) $\Delta(\ell,\mathcal{L}_t) > \theta_{\text{new}}$---
-the loop is sufficiently distinct from existing ones.
+The admissibility condition `Adm(ell)` requires four things:
+(i) `O(q_ell)`, meaning the closure predicate is evaluable;
+(ii) `T_ell != emptyset`, meaning at least one trigger condition exists;
+(iii) `rho_ell > theta_rho` or `HighStake(T_ell)`, meaning the obligation is
+consequential or its triggers reference irreversible actions; and
+(iv) `Delta(ell, L_t) > theta_new`, meaning the loop is sufficiently distinct
+from existing ones.
 
 ### Opening and Activating Loops
 
@@ -157,8 +153,8 @@ $$
 (b_{\ell,d},\, \nu_{\ell,d},\, c_{\ell,d},\, \mathcal{E}^*_{\ell,d})
 $$
 
-A loop activates when $b_{\ell,d} = 1$ and
-$c_{\ell,d} > \theta_{\text{act}}$ for some $d$. Under context budget
+A loop activates when `b_{ell,d} = 1` and `c_{ell,d} > theta_act` for some
+decision object `d`. Under context budget
 pressure, activated loops are prioritized by
 
 $$
