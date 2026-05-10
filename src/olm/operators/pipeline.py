@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, List, Tuple
 
-from .types import (
+from ..core.types import (
     DecisionObject,
     EvidenceItem,
     LoopResolution,
@@ -153,6 +153,7 @@ class RequiresClosedOperator:
             relation_type=relation,
             confidence=confidence,
             sufficient_evidence=self._sufficient_evidence(loop),
+            rationale=self._rationale(decision, loop, relation, requires_closed),
         )
 
     def _relation_type(self, decision: DecisionObject, loop: OpenLoop) -> str:
@@ -181,6 +182,15 @@ class RequiresClosedOperator:
             "scope_limit": ["confirm_scope_match"],
             "partial_verification": ["run_missing_integration_or_system_check"],
         }[loop.loop_type]
+
+    def _rationale(self, decision: DecisionObject, loop: OpenLoop, relation: str, requires_closed: bool) -> str:
+        if not requires_closed:
+            return f"{decision.object_type} does not currently depend strongly enough on unresolved {loop.loop_type}."
+        if relation == "act_precond":
+            return f"Action depends on closing unresolved {loop.loop_type} before execution."
+        if relation == "mem_license":
+            return f"Memory use is conditioned on unresolved {loop.loop_type} and should be downgraded."
+        return f"Claim or reasoning depends on unresolved {loop.loop_type} and should be qualified."
 
 
 class CloseOperator:

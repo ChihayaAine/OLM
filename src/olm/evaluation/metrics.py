@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Dict, Iterable, List, Sequence
 
-from .types import Session, StepTrace
+from ..core.types import Session, StepTrace
 
 
 @dataclass

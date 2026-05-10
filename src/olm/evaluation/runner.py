@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .runtime import OLMConfig, OLMRuntime
-from .components import OLMComponents, build_mock_components, build_openai_components
+from ..core.types import StepTrace
+from ..operators.components import OLMComponents, build_mock_components, build_provider_components
+from ..runtime.engine import OLMConfig, OLMRuntime
 from .benchmarks import BenchmarkDataset
-from .evaluation import EvaluationReport, evaluate_sessions
-from .types import StepTrace
+from .metrics import EvaluationReport, evaluate_sessions
 
 
 @dataclass
@@ -28,8 +28,8 @@ def build_runtime(
     if components is None:
         if backend == "mock":
             components = build_mock_components(resolved_config.activation_threshold)
-        elif backend == "openai":
-            components = build_openai_components(resolved_config.activation_threshold)
+        elif backend == "provider":
+            components = build_provider_components(resolved_config.activation_threshold)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
     return OLMRuntime(config=resolved_config, components=components)

@@ -45,7 +45,7 @@ long-term memory tasks.
 
 ## OLM
 
-![OLM Framework](resource/OLM.pdf)
+![OLM Framework](resource/OLM.png)
 
 ## Methodology
 
@@ -168,7 +168,7 @@ where $u_\ell \in [0,1]$ is a type-specific unresolvedness score.
 The relation type `nu_ell_d` routes each activated loop to one of
 three gate types:
 
-| $\nu_{\ell,d}$ | Gate type | Effect |
+| `nu_ell_d` | Gate type | Effect |
 |---|---|---|
 | `claim_dep` | Epistemic | Hedge, qualify, or verify before claiming |
 | `act_precond` | Action | Block or route through hard gate |
@@ -198,8 +198,8 @@ $$
 \{\texttt{usable},\, \texttt{context\_only},\, \texttt{requires\_qualification},\, \texttt{blocked}\}
 $$
 
-assigned when $\kappa_i \in \mathcal{M}_\ell$ and $\nu_{\ell,d} =
-`mem_license`. This separates factual content from evidentiary
+assigned when `kappa_i` is in `M_ell` and `nu_ell_d = mem_license`.
+This separates factual content from evidentiary
 role: ``unit test passed after parser patch'' remains factually correct,
 but an activated `partial_verification` loop prevents it from
 licensing ``root cause was resolved.''

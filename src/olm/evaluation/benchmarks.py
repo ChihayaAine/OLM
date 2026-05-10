@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence
 
-from .types import MemoryEntry, Session
+from ..core.types import MemoryEntry, Session
 
 
 SCENARIOS = (
@@ -63,7 +63,7 @@ class SyntheticObligationBenchmark:
             ),
             MemoryEntry(
                 memory_id="mem-pref",
-                text="User preferred terse summaries during incident review.",
+                text="A stakeholder preference for terse summaries was recorded during incident review.",
                 tags=["stakeholder", "preference", "incident"],
                 source="session-bootstrap",
                 metadata={"scope": "incident_review", "kind": "preference"},
@@ -94,7 +94,7 @@ class SyntheticObligationBenchmark:
             )[0]
             metadata = {
                 "scenario": scenario,
-                "domain": self.rng.choice(["software", "science", "planning", "assistant"]),
+                "domain": self.rng.choice(["software", "science", "planning", "operations"]),
                 "stakes": self.rng.choice(["medium", "high"]),
                 "risk_score": round(self.rng.uniform(0.35, 0.95), 2),
                 "query_type": self.rng.choice(["claim", "action", "memory_reuse"]),

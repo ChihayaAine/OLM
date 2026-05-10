@@ -103,6 +103,35 @@ class RequiresClosedResult:
     relation_type: str
     confidence: float
     sufficient_evidence: List[str] = field(default_factory=list)
+    rationale: str = ""
+
+
+@dataclass
+class ActivatedDecision:
+    loop_id: str
+    object_id: str
+    relation_type: str
+    confidence: float
+    priority: float
+    sufficient_evidence: List[str] = field(default_factory=list)
+    rationale: str = ""
+    age: int = 0
+    risk_score: float = 0.0
+    unresolvedness: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class LicenseTransition:
+    memory_id: str
+    previous_status: str
+    new_status: str
+    reason: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass
@@ -125,7 +154,10 @@ class StepTrace:
     blocked_actions: List[str]
     chosen_action: str
     final_action_state: str
+    license_transitions: List[LicenseTransition] = field(default_factory=list)
+    activated_records: List[ActivatedDecision] = field(default_factory=list)
     notes: Dict[str, Any] = field(default_factory=dict)
+    loop_summary: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

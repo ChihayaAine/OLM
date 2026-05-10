@@ -4,9 +4,9 @@ import argparse
 import json
 import os
 
-from .benchmarks import load_benchmark_dataset
-from .components import APINotConfiguredError
-from .runner import run_experiment, write_artifacts
+from ..evaluation.benchmarks import load_benchmark_dataset
+from ..evaluation.runner import run_experiment, write_artifacts
+from ..operators.components import APINotConfiguredError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,7 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--sessions-file")
     parser.add_argument("--memories-file")
-    parser.add_argument("--backend", choices=["auto", "mock", "openai"], default="auto")
+    parser.add_argument("--backend", choices=["auto", "mock", "provider"], default="auto")
     parser.add_argument("--output-dir")
     parser.add_argument("--json", action="store_true", help="Emit JSON traces and memory state.")
     return parser
@@ -26,7 +26,7 @@ def main() -> None:
     args = build_parser().parse_args()
     backend = args.backend
     if backend == "auto":
-        backend = "openai" if (os.environ.get("OPENAI_API_KEY") or os.environ.get("OLM_OPENAI_API_KEY")) else "mock"
+        backend = "provider" if (os.environ.get("OLM_API_KEY") and os.environ.get("OLM_API_BASE")) else "mock"
     dataset = load_benchmark_dataset(
         benchmark_name=args.benchmark,
         session_count=args.sessions,
@@ -37,7 +37,7 @@ def main() -> None:
     try:
         artifacts = run_experiment(dataset=dataset, backend=backend)
     except APINotConfiguredError as exc:
-        raise SystemExit(f"OpenAI backend is configured incorrectly: {exc}")
+        raise SystemExit(f"Provider backend is configured incorrectly: {exc}")
     if args.output_dir:
         write_artifacts(artifacts, args.output_dir)
     if args.json:

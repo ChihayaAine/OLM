@@ -5,10 +5,9 @@ from dataclasses import asdict, dataclass
 import os
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from .openai_client import OpenAIClientConfig, OpenAIClientError, OpenAIResponsesClient
-from .operators import CloseOperator, OpenOperator, RequiresClosedOperator
-from .store import ClosedMemoryStore
-from .types import (
+from ..core.store import ClosedMemoryStore
+from ..core.retrieval import build_query_profile, rank_memory_candidates
+from ..core.types import (
     DecisionObject,
     EvidenceItem,
     LoopResolution,
@@ -17,6 +16,8 @@ from .types import (
     RequiresClosedResult,
     Session,
 )
+from .provider_client import ProviderClientConfig, ProviderClientError, StructuredResponsesClient
+from .pipeline import CloseOperator, OpenOperator, RequiresClosedOperator
 
 
 class MemoryRetriever(ABC):
@@ -138,6 +139,14 @@ class MockPolicy(BasePolicy):
 
     def select_action(self, session: Session, candidates: Sequence[DecisionObject]) -> DecisionObject:
         return list(candidates)[0]
+
+    def retrieval_context(self, session: Session, retrieved: Sequence[MemoryEntry]) -> Dict[str, object]:
+        profile = build_query_profile(session.query, session.metadata)
+        ranking = rank_memory_candidates(retrieved, profile)
+        return {
+            "query_profile": profile.to_dict(),
+            "retrieval_scores": [item.to_dict() for item in ranking],
+        }
 
 
 class APINotConfiguredError(RuntimeError):
@@ -331,24 +340,24 @@ POLICY_SELECT_SCHEMA = {
 }
 
 
-class OpenAIBackedMixin:
-    def __init__(self, client: Optional[OpenAIResponsesClient] = None, model_name: Optional[str] = None) -> None:
+class ProviderBackedMixin:
+    def __init__(self, client: Optional[StructuredResponsesClient] = None, model_name: Optional[str] = None) -> None:
         if client is not None:
             self.client = client
         else:
-            config = OpenAIClientConfig(model=model_name or "gpt-4o-mini")
-            self.client = OpenAIResponsesClient(config)
+            config = ProviderClientConfig(model=model_name or "default")
+            self.client = StructuredResponsesClient(config)
 
     def _call_json(self, schema_name: str, schema: Dict[str, object], system_prompt: str, payload: Dict[str, object]) -> Dict[str, object]:
         try:
             return self.client.generate_json(schema_name=schema_name, schema=schema, system_prompt=system_prompt, payload=payload)
-        except OpenAIClientError as exc:
+        except ProviderClientError as exc:
             raise APINotConfiguredError(str(exc)) from exc
 
 
-class OpenAIRetriever(MemoryRetriever, OpenAIBackedMixin):
-    def __init__(self, client: Optional[OpenAIResponsesClient] = None, model_name: Optional[str] = None) -> None:
-        OpenAIBackedMixin.__init__(self, client=client, model_name=model_name)
+class ProviderRetriever(MemoryRetriever, ProviderBackedMixin):
+    def __init__(self, client: Optional[StructuredResponsesClient] = None, model_name: Optional[str] = None) -> None:
+        ProviderBackedMixin.__init__(self, client=client, model_name=model_name)
 
     def retrieve(self, store: ClosedMemoryStore, query: str, limit: int = 5) -> List[MemoryEntry]:
         lexical_candidates = store.retrieve(query, limit=max(limit * 2, limit))
@@ -374,9 +383,9 @@ class OpenAIRetriever(MemoryRetriever, OpenAIBackedMixin):
         return chosen[:limit] if chosen else lexical_candidates[:limit]
 
 
-class OpenAILoopExtractor(LoopExtractor, OpenAIBackedMixin):
-    def __init__(self, client: Optional[OpenAIResponsesClient] = None, model_name: Optional[str] = None) -> None:
-        OpenAIBackedMixin.__init__(self, client=client, model_name=model_name)
+class ProviderLoopExtractor(LoopExtractor, ProviderBackedMixin):
+    def __init__(self, client: Optional[StructuredResponsesClient] = None, model_name: Optional[str] = None) -> None:
+        ProviderBackedMixin.__init__(self, client=client, model_name=model_name)
         self.counter = 0
 
     def extract(self, session: Session, closed_memories: Sequence[MemoryEntry]) -> List[OpenLoop]:
@@ -437,14 +446,14 @@ class OpenAILoopExtractor(LoopExtractor, OpenAIBackedMixin):
         return loops
 
 
-class OpenAIClosureRequirementJudge(ClosureRequirementJudge, OpenAIBackedMixin):
+class ProviderClosureRequirementJudge(ClosureRequirementJudge, ProviderBackedMixin):
     def __init__(
         self,
         activation_threshold: float,
-        client: Optional[OpenAIResponsesClient] = None,
+        client: Optional[StructuredResponsesClient] = None,
         model_name: Optional[str] = None,
     ) -> None:
-        OpenAIBackedMixin.__init__(self, client=client, model_name=model_name)
+        ProviderBackedMixin.__init__(self, client=client, model_name=model_name)
         self.activation_threshold = activation_threshold
         self.prefilter_operator = RequiresClosedOperator(activation_threshold=activation_threshold)
 
@@ -483,9 +492,9 @@ class OpenAIClosureRequirementJudge(ClosureRequirementJudge, OpenAIBackedMixin):
         )
 
 
-class OpenAILoopCloser(LoopCloser, OpenAIBackedMixin):
-    def __init__(self, client: Optional[OpenAIResponsesClient] = None, model_name: Optional[str] = None) -> None:
-        OpenAIBackedMixin.__init__(self, client=client, model_name=model_name)
+class ProviderLoopCloser(LoopCloser, ProviderBackedMixin):
+    def __init__(self, client: Optional[StructuredResponsesClient] = None, model_name: Optional[str] = None) -> None:
+        ProviderBackedMixin.__init__(self, client=client, model_name=model_name)
 
     def apply(self, loop: OpenLoop, new_evidence: EvidenceItem) -> LoopResolution:
         payload = {
@@ -518,9 +527,9 @@ class OpenAILoopCloser(LoopCloser, OpenAIBackedMixin):
         )
 
 
-class OpenAIPolicy(BasePolicy, OpenAIBackedMixin):
-    def __init__(self, client: Optional[OpenAIResponsesClient] = None, model_name: Optional[str] = None) -> None:
-        OpenAIBackedMixin.__init__(self, client=client, model_name=model_name)
+class ProviderPolicy(BasePolicy, ProviderBackedMixin):
+    def __init__(self, client: Optional[StructuredResponsesClient] = None, model_name: Optional[str] = None) -> None:
+        ProviderBackedMixin.__init__(self, client=client, model_name=model_name)
         self.fallback = MockPolicy()
 
     def propose_actions(self, session: Session, retrieved: Sequence[MemoryEntry]) -> List[DecisionObject]:
@@ -616,22 +625,22 @@ def build_mock_components(activation_threshold: float) -> OLMComponents:
     )
 
 
-def build_openai_components(activation_threshold: float, model_name: Optional[str] = None) -> OLMComponents:
-    client = OpenAIResponsesClient(
-        OpenAIClientConfig(
-            model=model_name or os.environ.get("OLM_OPENAI_MODEL", "gpt-4o-mini"),
-            timeout_seconds=int(os.environ.get("OLM_OPENAI_TIMEOUT", "60")),
-            max_retries=int(os.environ.get("OLM_OPENAI_MAX_RETRIES", "2")),
+def build_provider_components(activation_threshold: float, model_name: Optional[str] = None) -> OLMComponents:
+    client = StructuredResponsesClient(
+        ProviderClientConfig(
+            model=model_name or os.environ.get("OLM_PROVIDER_MODEL", "default"),
+            timeout_seconds=int(os.environ.get("OLM_PROVIDER_TIMEOUT", "60")),
+            max_retries=int(os.environ.get("OLM_PROVIDER_MAX_RETRIES", "2")),
         )
     )
     return OLMComponents(
-        retriever=OpenAIRetriever(client=client),
-        extractor=OpenAILoopExtractor(client=client),
-        judge=OpenAIClosureRequirementJudge(activation_threshold, client=client),
-        closer=OpenAILoopCloser(client=client),
-        policy=OpenAIPolicy(client=client),
+        retriever=ProviderRetriever(client=client),
+        extractor=ProviderLoopExtractor(client=client),
+        judge=ProviderClosureRequirementJudge(activation_threshold, client=client),
+        closer=ProviderLoopCloser(client=client),
+        policy=ProviderPolicy(client=client),
     )
 
 
 def build_api_ready_components(activation_threshold: float) -> OLMComponents:
-    return build_openai_components(activation_threshold)
+    return build_provider_components(activation_threshold)
