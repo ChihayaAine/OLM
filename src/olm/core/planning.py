@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 from typing import Dict, Iterable, List, Sequence
+
+from pydantic import BaseModel
 
 from .types import OpenLoop
 
 
-@dataclass
-class VerificationPlan:
+class VerificationPlan(BaseModel):
     loop_id: str
     modality: str
     recommended_step: str
@@ -15,7 +15,7 @@ class VerificationPlan:
     justification: str
 
     def to_dict(self) -> Dict[str, object]:
-        return asdict(self)
+        return self.model_dump()
 
 
 def plan_verification_steps(loops: Iterable[OpenLoop]) -> List[VerificationPlan]:

@@ -1,35 +1,36 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 from typing import Dict, Iterable, List, Sequence
+
+from pydantic import BaseModel, Field
+from rapidfuzz import fuzz
 
 from .types import MemoryEntry
 
 
-@dataclass
-class QueryProfile:
+class QueryProfile(BaseModel):
     raw_query: str
-    query_terms: List[str]
+    query_terms: List[str] = Field(default_factory=list)
     domain_hint: str
     stakes: str
     query_type: str
 
     def to_dict(self) -> Dict[str, object]:
-        return asdict(self)
+        return self.model_dump()
 
 
-@dataclass
-class RetrievalDecision:
+class RetrievalDecision(BaseModel):
     memory_id: str
     lexical_overlap: int
     tag_match: int
     scope_bonus: float
+    semantic_bonus: float
     license_penalty: float
     confidence_bonus: float
     final_score: float
 
     def to_dict(self) -> Dict[str, object]:
-        return asdict(self)
+        return self.model_dump()
 
 
 def build_query_profile(query: str, metadata: Dict[str, object]) -> QueryProfile:
@@ -57,6 +58,7 @@ def rank_memory_candidates(
         tag_match = sum(1 for tag in entry.tags if tag.lower() in raw_query_lower)
         entry_domain = str(entry.metadata.get("domain", entry.metadata.get("scope", ""))).lower()
         scope_bonus = 0.2 if entry_domain and entry_domain == profile.domain_hint.lower() else 0.0
+        semantic_bonus = fuzz.token_set_ratio(profile.raw_query, f"{entry.text} {' '.join(entry.tags)}") / 1000.0
         confidence_bonus = 0.25 * float(entry.factual_confidence)
         license_penalty = {
             "usable": 0.0,
@@ -66,13 +68,14 @@ def rank_memory_candidates(
         }.get(entry.license_status, 0.1)
         if profile.query_type == "memory_reuse" and entry.license_status == "requires_qualification":
             license_penalty += 0.05
-        final_score = float(lexical_overlap + tag_match) + scope_bonus + confidence_bonus - license_penalty
+        final_score = float(lexical_overlap + tag_match) + scope_bonus + semantic_bonus + confidence_bonus - license_penalty
         decisions.append(
             RetrievalDecision(
                 memory_id=entry.memory_id,
                 lexical_overlap=lexical_overlap,
                 tag_match=tag_match,
                 scope_bonus=scope_bonus,
+                semantic_bonus=semantic_bonus,
                 license_penalty=license_penalty,
                 confidence_bonus=confidence_bonus,
                 final_score=final_score,

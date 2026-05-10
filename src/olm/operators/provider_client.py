@@ -3,22 +3,23 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from urllib import error, request
+
+from pydantic import BaseModel, Field
 
 
 class ProviderClientError(RuntimeError):
     pass
 
 
-@dataclass
-class ProviderClientConfig:
+class ProviderClientConfig(BaseModel):
     model: str = "default"
     timeout_seconds: int = 60
     max_retries: int = 2
     api_base_env: str = "OLM_API_BASE"
     api_key_env: str = "OLM_API_KEY"
+    extra_headers: Dict[str, str] = Field(default_factory=dict)
 
 
 class StructuredResponsesClient:
@@ -75,6 +76,7 @@ class StructuredResponsesClient:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+        headers.update(self.config.extra_headers)
         last_error: Optional[Exception] = None
         for attempt in range(self.config.max_retries + 1):
             req = request.Request(api_base, data=encoded, headers=headers, method="POST")
